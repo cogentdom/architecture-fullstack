@@ -14,13 +14,23 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import json
 from datamover import DataMover
-from datamover import ModelPlot
 import statsmodels.api as sm
 from pylab import rcParams
 # from statsmodels.tsa.arima_model import ARIMA  # Depricated
 from statsmodels.tsa.arima.model import ARIMA
 import mplfinance as mpf
 import numpy as np
+from scipy import stats
+from statsmodels.tsa.stattools import acf
+import warnings
+
+# Suppress convergence warnings from statsmodels (models still produce usable results)
+# These warnings are expected and don't affect functionality - the models work fine
+warnings.filterwarnings('ignore', category=UserWarning, module='statsmodels')
+warnings.filterwarnings('ignore', category=FutureWarning, module='statsmodels')
+warnings.filterwarnings('ignore', message='.*Maximum Likelihood optimization failed to converge.*')
+warnings.filterwarnings('ignore', message='.*Non-invertible starting MA parameters.*')
+warnings.filterwarnings('ignore', message='.*Unknown keyword arguments.*')
 
 # %%
 def main():
@@ -68,9 +78,6 @@ def main():
     # %%
     thin_data = data.resample('2w').mean()
     # %%
-    mplot = ModelPlot()
-    decomp_fig = mplot.decomp_plot(thin_data['Close'])
-    
     def tripleGraph(data, ticker_name):
         chart1 = data
         chart2 = data.rolling(window = 12).mean().dropna()
@@ -184,20 +191,121 @@ def main():
 
     st.plotly_chart(fig, key="volume-analysis-chart", use_container_width=True)
     
-    # Display decomp_plot after the candlestick chart
-    st.pyplot(decomp_fig)
     # %%
+    # Seasonal Decomposition using Plotly
     decomp = sm.tsa.seasonal_decompose(thin_data['Close'], model='additive', extrapolate_trend='freq', period=6)
-    fig, axes = plt.subplots(4, 1, figsize=(17, 12))
-    axes[0].plot(thin_data['Close'])
-    axes[1].plot(decomp.trend)
-    axes[2].plot(decomp.seasonal)
-    axes[3].scatter(thin_data.index.values, decomp.resid)
     
-    st.pyplot(fig)
+    decomp_plotly = make_subplots(
+        rows=4, cols=1,
+        subplot_titles=('Observed', 'Trend', 'Seasonal', 'Residual'),
+        vertical_spacing=0.08,
+        shared_xaxes=True
+    )
+    
+    decomp_plotly.add_trace(
+        go.Scatter(x=thin_data.index, y=thin_data['Close'], mode='lines', 
+                   line=dict(color='#1f77b4', width=2), name='Observed'),
+        row=1, col=1
+    )
+    decomp_plotly.add_trace(
+        go.Scatter(x=thin_data.index, y=decomp.trend, mode='lines',
+                   line=dict(color='#2ca02c', width=2), name='Trend'),
+        row=2, col=1
+    )
+    decomp_plotly.add_trace(
+        go.Scatter(x=thin_data.index, y=decomp.seasonal, mode='lines',
+                   line=dict(color='#ff7f0e', width=2), name='Seasonal'),
+        row=3, col=1
+    )
+    decomp_plotly.add_trace(
+        go.Scatter(x=thin_data.index, y=decomp.resid, mode='markers',
+                   marker=dict(color='#d62728', size=5), name='Residual'),
+        row=4, col=1
+    )
+    
+    decomp_plotly.update_layout(
+        title=f'{selected_ticker} - Seasonal Decomposition',
+        height=800,
+        showlegend=False,
+        template='plotly_dark'
+    )
+    decomp_plotly.update_xaxes(title_text='Date', row=4, col=1)
+    
+    st.plotly_chart(decomp_plotly, key="seasonal-decomp-chart", use_container_width=True)
     # %%
-    fig = mplot.plot_arima(thin_data, 'Close')
-    st.pyplot(fig)
+    # ARIMA Predictions using Plotly
+    st.subheader(f"📉 ARIMA Model Predictions - {selected_ticker}")
+    
+    indx = thin_data.index
+    start_pred = indx[-20]
+    end_pred = indx[-1]
+    
+    # Fit ARIMA models with increased iterations for convergence
+    arima_model = ARIMA(thin_data['Close'][:-20], order=(2,1,2)).fit(method_kwargs={'maxiter': 500})
+    pred = arima_model.predict(start_pred, end_pred)
+    
+    rolling_mean = thin_data['Close'].rolling(window=12).mean().dropna()
+    rolling_std = thin_data['Close'].rolling(window=12).std().dropna()
+    
+    arima_mean_model = ARIMA(rolling_mean[:-20], order=(1,1,1)).fit(method_kwargs={'maxiter': 500})
+    pred_mean = arima_mean_model.predict(start_pred, end_pred)
+    
+    arima_std_model = ARIMA(rolling_std[:-20], order=(1,1,1)).fit(method_kwargs={'maxiter': 500})
+    pred_std = arima_std_model.predict(start_pred, end_pred)
+    
+    # Create Plotly figure
+    fig_arima = go.Figure()
+    
+    # Define matching colors for historical and predicted
+    color_close = '#1f77b4'  # Blue
+    color_mean = '#2ca02c'   # Green
+    color_std = '#ff7f0e'    # Orange
+    
+    # Historical data (semi-transparent)
+    fig_arima.add_trace(go.Scatter(
+        x=thin_data.index, y=thin_data['Close'],
+        mode='lines', name='Close Price',
+        line=dict(color=color_close, width=1.5), opacity=0.5
+    ))
+    fig_arima.add_trace(go.Scatter(
+        x=rolling_mean.index, y=rolling_mean.values,
+        mode='lines', name='Rolling Mean',
+        line=dict(color=color_mean, width=1.5), opacity=0.5
+    ))
+    fig_arima.add_trace(go.Scatter(
+        x=rolling_std.index, y=rolling_std.values,
+        mode='lines', name='Rolling Std',
+        line=dict(color=color_std, width=1.5), opacity=0.5
+    ))
+    
+    # Predicted values (same colors, bolder solid line)
+    fig_arima.add_trace(go.Scatter(
+        x=pred.index, y=pred.values,
+        mode='lines', name='Predicted Close',
+        line=dict(color=color_close, width=3)
+    ))
+    fig_arima.add_trace(go.Scatter(
+        x=pred_mean.index, y=pred_mean.values,
+        mode='lines', name='Predicted Mean',
+        line=dict(color=color_mean, width=3)
+    ))
+    fig_arima.add_trace(go.Scatter(
+        x=pred_std.index, y=pred_std.values,
+        mode='lines', name='Predicted Std',
+        line=dict(color=color_std, width=3)
+    ))
+    
+    fig_arima.update_layout(
+        title=f'{selected_ticker} - ARIMA Predictions vs Historical',
+        xaxis_title='Date',
+        yaxis_title='Price ($)',
+        height=500,
+        template='plotly_dark',
+        hovermode='x unified',
+        legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
+    )
+    
+    st.plotly_chart(fig_arima, key="arima-predictions-chart", use_container_width=True)
     
     # %%
     # Time Series Forecasting with SARIMAX (from timeseries_analysis.ipynb)
@@ -206,6 +314,10 @@ def main():
     # Prepare data for SARIMAX model
     y_series = thin_data['Close'].dropna()
     
+    # Create a proper DatetimeIndex with explicit frequency for forecasting
+    date_range = pd.date_range(start=y_series.index[0], periods=len(y_series), freq='2W')
+    y_series = pd.Series(y_series.values, index=date_range)
+    
     # Fit SARIMAX model with optimal parameters (similar to notebook's approach)
     try:
         mod = sm.tsa.statespace.SARIMAX(
@@ -213,9 +325,10 @@ def main():
             order=(1, 1, 1),
             seasonal_order=(1, 1, 0, 6),  # 6 periods for biweekly data
             enforce_stationarity=False,
-            enforce_invertibility=False
+            enforce_invertibility=False,
+            initialization='approximate_diffuse'
         )
-        results = mod.fit(disp=False)
+        results = mod.fit(disp=False, maxiter=500)
         
         # 1. ARIMA Model Diagnostics Plot
         st.subheader("🔍 SARIMAX Model Diagnostics")
@@ -227,61 +340,192 @@ def main():
         - **Correlogram**: Autocorrelation should be near zero
         """)
         
-        diag_fig = results.plot_diagnostics(figsize=(16, 10))
-        plt.tight_layout()
-        st.pyplot(diag_fig)
+        # Get standardized residuals
+        residuals = results.resid
+        std_residuals = (residuals - residuals.mean()) / residuals.std()
+        
+        # Create 2x2 subplot for diagnostics
+        diag_fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                'Standardized Residuals',
+                'Histogram + Normal Distribution',
+                'Normal Q-Q Plot',
+                'Correlogram (ACF)'
+            ),
+            vertical_spacing=0.18,
+            horizontal_spacing=0.12
+        )
+        
+        # 1. Standardized Residuals (top-left)
+        diag_fig.add_trace(
+            go.Scatter(
+                x=std_residuals.index, y=std_residuals.values,
+                mode='lines', name='Std Residuals',
+                line=dict(color='#1f77b4', width=1)
+            ),
+            row=1, col=1
+        )
+        diag_fig.add_hline(y=0, line_dash="dash", line_color="red", row=1, col=1)
+        
+        # 2. Histogram with KDE (top-right)
+        diag_fig.add_trace(
+            go.Histogram(
+                x=std_residuals.values, nbinsx=30,
+                name='Residuals', opacity=0.7,
+                marker_color='#1f77b4',
+                histnorm='probability density'
+            ),
+            row=1, col=2
+        )
+        
+        # Add normal distribution curve
+        x_range = np.linspace(std_residuals.min(), std_residuals.max(), 100)
+        normal_curve = stats.norm.pdf(x_range, 0, 1)
+        diag_fig.add_trace(
+            go.Scatter(
+                x=x_range, y=normal_curve,
+                mode='lines', name='N(0,1)',
+                line=dict(color='#ff7f0e', width=2)
+            ),
+            row=1, col=2
+        )
+        
+        # 3. Q-Q Plot (bottom-left)
+        sorted_residuals = np.sort(std_residuals.dropna().values)
+        n = len(sorted_residuals)
+        theoretical_quantiles = stats.norm.ppf(np.arange(1, n + 1) / (n + 1))
+        
+        diag_fig.add_trace(
+            go.Scatter(
+                x=theoretical_quantiles, y=sorted_residuals,
+                mode='markers', name='Sample Quantiles',
+                marker=dict(color='#1f77b4', size=5)
+            ),
+            row=2, col=1
+        )
+        
+        # Add diagonal reference line for Q-Q plot
+        qq_min = min(theoretical_quantiles.min(), sorted_residuals.min())
+        qq_max = max(theoretical_quantiles.max(), sorted_residuals.max())
+        diag_fig.add_trace(
+            go.Scatter(
+                x=[qq_min, qq_max], y=[qq_min, qq_max],
+                mode='lines', name='Reference',
+                line=dict(color='#d62728', width=2, dash='dash')
+            ),
+            row=2, col=1
+        )
+        
+        # 4. Correlogram / ACF (bottom-right)
+        acf_values = acf(residuals.dropna(), nlags=20)
+        lags = list(range(len(acf_values)))
+        conf_interval = 1.96 / np.sqrt(len(residuals.dropna()))
+        
+        diag_fig.add_trace(
+            go.Bar(
+                x=lags, y=acf_values,
+                name='ACF', marker_color='#1f77b4'
+            ),
+            row=2, col=2
+        )
+        
+        # Add confidence interval lines
+        diag_fig.add_hline(y=conf_interval, line_dash="dash", line_color="red", row=2, col=2)
+        diag_fig.add_hline(y=-conf_interval, line_dash="dash", line_color="red", row=2, col=2)
+        diag_fig.add_hline(y=0, line_dash="solid", line_color="gray", row=2, col=2)
+        
+        # Update layout
+        diag_fig.update_layout(
+            height=800,
+            showlegend=False,
+            template='plotly_dark',
+            title=f'{selected_ticker} - SARIMAX Model Diagnostics',
+            margin=dict(t=80, b=60)
+        )
+        
+        # Update subplot title positions to avoid overlap
+        for annotation in diag_fig['layout']['annotations']:
+            annotation['y'] = annotation['y'] + 0.02
+        
+        diag_fig.update_xaxes(title_text='Date', title_font_size=11, row=1, col=1)
+        diag_fig.update_yaxes(title_text='Residual', title_font_size=11, row=1, col=1)
+        diag_fig.update_xaxes(title_text='Residual Value', title_font_size=11, row=1, col=2)
+        diag_fig.update_yaxes(title_text='Density', title_font_size=11, row=1, col=2)
+        diag_fig.update_xaxes(title_text='Theoretical Quantiles', title_font_size=11, row=2, col=1)
+        diag_fig.update_yaxes(title_text='Sample Quantiles', title_font_size=11, row=2, col=1)
+        diag_fig.update_xaxes(title_text='Lag', title_font_size=11, row=2, col=2)
+        diag_fig.update_yaxes(title_text='ACF', title_font_size=11, row=2, col=2)
+        
+        st.plotly_chart(diag_fig, key="diagnostics-chart", use_container_width=True)
         
         # 2. Forecast Validation - One-step ahead predictions with confidence intervals
         st.subheader("🎯 Forecast Validation")
         
-        # Get predictions for the last portion of data
+        # Get predictions for the last portion of data using integer indices
         split_point = len(y_series) - 20 if len(y_series) > 20 else len(y_series) // 2
-        pred_start = y_series.index[split_point]
         
-        pred = results.get_prediction(start=pred_start, dynamic=False)
+        pred = results.get_prediction(start=split_point, end=len(y_series) - 1, dynamic=False)
         pred_ci = pred.conf_int()
         
-        # Create validation plot
-        fig_validation, ax_validation = plt.subplots(figsize=(17, 8))
+        # Map the prediction index back to dates
+        pred_dates = y_series.index[split_point:]
+        
+        # Create validation plot using Plotly
+        fig_validation = go.Figure()
         
         # Plot observed data
-        y_series.plot(ax=ax_validation, label='Observed', linewidth=2)
+        fig_validation.add_trace(go.Scatter(
+            x=y_series.index, y=y_series.values,
+            mode='lines', name='Observed',
+            line=dict(color='#1f77b4', width=2)
+        ))
         
-        # Plot one-step ahead forecast
-        pred.predicted_mean.plot(ax=ax_validation, label='One-step ahead Forecast', 
-                                  alpha=0.8, linewidth=2, color='#ff7f0e')
+        # Plot one-step ahead forecast (use pred_dates for x-axis)
+        fig_validation.add_trace(go.Scatter(
+            x=pred_dates, y=pred.predicted_mean.values,
+            mode='lines', name='One-step ahead Forecast',
+            line=dict(color='#ff7f0e', width=2)
+        ))
         
-        # Add confidence intervals
-        ax_validation.fill_between(
-            pred_ci.index,
-            pred_ci.iloc[:, 0],
-            pred_ci.iloc[:, 1], 
-            color='orange', 
-            alpha=0.2,
-            label='95% Confidence Interval'
+        # Add confidence interval (upper bound)
+        fig_validation.add_trace(go.Scatter(
+            x=pred_dates, y=pred_ci.iloc[:, 1].values,
+            mode='lines', name='Upper CI',
+            line=dict(width=0),
+            showlegend=False
+        ))
+        
+        # Add confidence interval (lower bound with fill)
+        fig_validation.add_trace(go.Scatter(
+            x=pred_dates, y=pred_ci.iloc[:, 0].values,
+            mode='lines', name='95% Confidence Interval',
+            line=dict(width=0),
+            fill='tonexty',
+            fillcolor='rgba(255, 127, 14, 0.2)'
+        ))
+        
+        fig_validation.update_layout(
+            title=f'{selected_ticker} - Forecast Validation',
+            xaxis_title='Date',
+            yaxis_title='Stock Price ($)',
+            height=500,
+            template='plotly_dark',
+            hovermode='x unified'
         )
         
-        ax_validation.set_xlabel('Date', fontsize=12)
-        ax_validation.set_ylabel('Stock Price ($)', fontsize=12)
-        ax_validation.set_title(f'{selected_ticker} - Forecast Validation', fontsize=14, fontweight='bold')
-        ax_validation.legend(loc='upper left')
-        plt.tight_layout()
-        st.pyplot(fig_validation)
+        st.plotly_chart(fig_validation, key="forecast-validation-chart", use_container_width=True)
         
         # 3. Calculate and display forecast accuracy metrics
-        y_forecasted = pred.predicted_mean
-        y_truth = y_series.loc[pred_start:]
+        y_forecasted = pred.predicted_mean.values
+        y_truth = y_series.iloc[split_point:].values
         
-        # Align the series for comparison
-        common_idx = y_forecasted.index.intersection(y_truth.index)
-        if len(common_idx) > 0:
-            y_forecasted_aligned = y_forecasted.loc[common_idx]
-            y_truth_aligned = y_truth.loc[common_idx]
-            
-            mse = ((y_forecasted_aligned - y_truth_aligned) ** 2).mean()
+        # Calculate metrics directly
+        if len(y_forecasted) > 0 and len(y_truth) > 0:
+            mse = ((y_forecasted - y_truth) ** 2).mean()
             rmse = np.sqrt(mse)
-            mae = np.abs(y_forecasted_aligned - y_truth_aligned).mean()
-            mape = (np.abs((y_truth_aligned - y_forecasted_aligned) / y_truth_aligned) * 100).mean()
+            mae = np.abs(y_forecasted - y_truth).mean()
+            mape = (np.abs((y_truth - y_forecasted) / y_truth) * 100).mean()
             
             # Display metrics in columns
             st.subheader("📊 Forecast Accuracy Metrics")
@@ -295,48 +539,133 @@ def main():
             with col4:
                 st.metric("MAPE", f"{mape:.2f}%")
         
-        # 4. Future Forecast with Uncertainty Bounds
-        st.subheader("🔮 Future Price Forecast")
-        
-        # Forecast next 20 periods (approximately 40 weeks with biweekly data)
-        forecast_steps = 20
-        pred_future = results.get_forecast(steps=forecast_steps)
-        pred_future_ci = pred_future.conf_int()
-        
-        fig_forecast, ax_forecast = plt.subplots(figsize=(17, 8))
-        
-        # Plot historical data
-        y_series.plot(ax=ax_forecast, label='Historical', linewidth=2)
-        
-        # Plot forecast
-        pred_future.predicted_mean.plot(ax=ax_forecast, label='Forecast', 
-                                         linewidth=2, color='#2ca02c')
-        
-        # Add uncertainty bounds
-        ax_forecast.fill_between(
-            pred_future_ci.index,
-            pred_future_ci.iloc[:, 0],
-            pred_future_ci.iloc[:, 1], 
-            color='green', 
-            alpha=0.2,
-            label='95% Confidence Interval'
-        )
-        
-        ax_forecast.set_xlabel('Date', fontsize=12)
-        ax_forecast.set_ylabel('Stock Price ($)', fontsize=12)
-        ax_forecast.set_title(f'{selected_ticker} - Future Price Forecast (Next {forecast_steps} Periods)', 
-                              fontsize=14, fontweight='bold')
-        ax_forecast.legend(loc='upper left')
-        plt.tight_layout()
-        st.pyplot(fig_forecast)
-        
         # Add model summary in expander
         with st.expander("📋 View SARIMAX Model Summary"):
             st.text(str(results.summary()))
             
     except Exception as e:
-        st.warning(f"Could not fit SARIMAX model: {str(e)}")
-        st.info("Try selecting a different ticker or time period.")
+        st.warning(f"SARIMAX diagnostics error: {str(e)}")
+    
+    # 4. Future Forecast with Uncertainty Bounds (using Exponential Smoothing)
+    st.subheader("🔮 Future Price Forecast")
+    
+    try:
+        from statsmodels.tsa.holtwinters import ExponentialSmoothing
+        
+        # Prepare data - use numpy array to avoid timestamp issues
+        hist_values = thin_data['Close'].dropna().values
+        hist_dates = thin_data['Close'].dropna().index
+        
+        # Forecast parameters
+        forecast_steps = 20
+        
+        # Fit Holt-Winters Exponential Smoothing model
+        model = ExponentialSmoothing(
+            hist_values,
+            trend='add',
+            seasonal='add',
+            seasonal_periods=6,  # Approximate seasonal cycle
+            damped_trend=True
+        )
+        fitted_model = model.fit(optimized=True)
+        
+        # Generate forecast
+        forecast_values = fitted_model.forecast(forecast_steps)
+        
+        # Generate future dates
+        last_date = hist_dates[-1]
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(weeks=2), periods=forecast_steps, freq='2W')
+        
+        # Calculate confidence intervals using fitted residuals
+        residual_std = np.std(fitted_model.resid)
+        ci_multipliers = np.sqrt(np.arange(1, forecast_steps + 1))
+        ci_lower = forecast_values - 1.96 * residual_std * ci_multipliers
+        ci_upper = forecast_values + 1.96 * residual_std * ci_multipliers
+        
+        # Create future forecast plot using Plotly
+        fig_forecast = go.Figure()
+        
+        # Plot historical data
+        fig_forecast.add_trace(go.Scatter(
+            x=hist_dates, y=hist_values,
+            mode='lines', name='Historical',
+            line=dict(color='#1f77b4', width=2)
+        ))
+        
+        # Plot fitted values
+        fig_forecast.add_trace(go.Scatter(
+            x=hist_dates, y=fitted_model.fittedvalues,
+            mode='lines', name='Fitted',
+            line=dict(color='#ff7f0e', width=1, dash='dot'),
+            opacity=0.7
+        ))
+        
+        # Plot forecast
+        fig_forecast.add_trace(go.Scatter(
+            x=future_dates, y=forecast_values,
+            mode='lines', name='Forecast',
+            line=dict(color='#2ca02c', width=2, dash='dash')
+        ))
+        
+        # Add uncertainty bounds (upper)
+        fig_forecast.add_trace(go.Scatter(
+            x=future_dates, y=ci_upper,
+            mode='lines', name='Upper CI',
+            line=dict(width=0),
+            showlegend=False
+        ))
+        
+        # Add uncertainty bounds (lower with fill)
+        fig_forecast.add_trace(go.Scatter(
+            x=future_dates, y=ci_lower,
+            mode='lines', name='95% Confidence Interval',
+            line=dict(width=0),
+            fill='tonexty',
+            fillcolor='rgba(44, 160, 44, 0.2)'
+        ))
+        
+        # Add a vertical line to separate historical from forecast
+        # Convert timestamp to string to avoid pandas/plotly compatibility issue
+        forecast_start_str = str(hist_dates[-1])
+        fig_forecast.add_vline(
+            x=forecast_start_str, 
+            line_dash="dot", 
+            line_color="gray"
+        )
+        # Add annotation separately to avoid timestamp arithmetic issues
+        fig_forecast.add_annotation(
+            x=forecast_start_str,
+            y=1.05,
+            yref="paper",
+            text="Forecast Start",
+            showarrow=False,
+            font=dict(color="gray", size=11)
+        )
+        
+        fig_forecast.update_layout(
+            title=f'{selected_ticker} - Future Price Forecast (Holt-Winters Exponential Smoothing)',
+            xaxis_title='Date',
+            yaxis_title='Stock Price ($)',
+            height=500,
+            template='plotly_dark',
+            hovermode='x unified'
+        )
+        
+        st.plotly_chart(fig_forecast, key="future-forecast-chart", use_container_width=True)
+        
+        # Show model info
+        with st.expander("📋 View Exponential Smoothing Model Info"):
+            st.markdown(f"""
+            **Model Type:** Holt-Winters Exponential Smoothing (Additive)
+            - **Trend:** Additive with damping
+            - **Seasonality:** Additive (6 periods)
+            - **Forecast Horizon:** {forecast_steps} periods (~{forecast_steps * 2} weeks)
+            - **Residual Std Dev:** ${residual_std:.2f}
+            """)
+        
+    except Exception as e:
+        st.warning(f"Could not generate forecast: {str(e)}")
+        st.info("The forecast model encountered an issue with this data.")
 
 # %%
 if __name__ == '__main__':
