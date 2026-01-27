@@ -76,21 +76,72 @@ def main():
         st.markdown("---")
         
         st.subheader("Stock Selection")
-        selected_ticker = st.selectbox(
-            "Choose a stock ticker to analyze:",
-            options=ticker_list,
-            index=ticker_list.index(st.session_state.selected_ticker),
-            key='ticker_selector'
+        
+        # Option to choose between predefined or custom ticker
+        selection_mode = st.radio(
+            "Selection Mode:",
+            options=["Quick Select", "Custom Ticker"],
+            horizontal=True,
+            help="Choose from popular stocks or enter your own ticker symbol"
         )
+        
+        if selection_mode == "Quick Select":
+            selected_ticker = st.selectbox(
+                "Choose a stock ticker to analyze:",
+                options=ticker_list,
+                index=ticker_list.index(st.session_state.selected_ticker) if st.session_state.selected_ticker in ticker_list else 0,
+                key='ticker_selector'
+            )
+        else:
+            selected_ticker = st.text_input(
+                "Enter ticker symbol:",
+                value=st.session_state.selected_ticker,
+                placeholder="e.g., NVDA, AMZN, META",
+                help="Enter any valid stock ticker symbol from Yahoo Finance",
+                key='custom_ticker_input'
+            ).upper().strip()
+            
+            if not selected_ticker:
+                st.warning("⚠️ Please enter a ticker symbol")
+                selected_ticker = st.session_state.selected_ticker
+            
+            # Show helpful examples
+            with st.expander("📖 Ticker Symbol Examples"):
+                st.markdown("""
+                **Tech Stocks:**
+                - NVDA (NVIDIA)
+                - AMZN (Amazon)
+                - META (Meta/Facebook)
+                - NFLX (Netflix)
+                - AMD (AMD)
+                
+                **Other Sectors:**
+                - BA (Boeing)
+                - JPM (JP Morgan)
+                - DIS (Disney)
+                - NKE (Nike)
+                - COIN (Coinbase)
+                
+                **International Stocks:**
+                - TSM (Taiwan Semiconductor)
+                - BABA (Alibaba)
+                - SHOP (Shopify)
+                
+                💡 Visit [Yahoo Finance](https://finance.yahoo.com/) to find more ticker symbols!
+                """)
+        
         st.session_state.selected_ticker = selected_ticker
         
         st.markdown("---")
         st.markdown("""
-        ### 📈 Available Tickers
+        ### 📈 Popular Tickers
         - **AAPL** - Apple Inc.
         - **GOOG** - Alphabet Inc.
         - **MSFT** - Microsoft Corp.
         - **TSLA** - Tesla Inc.
+        - **NVDA** - NVIDIA Corp.
+        - **AMZN** - Amazon.com Inc.
+        - **META** - Meta Platforms Inc.
         
         ### 📅 Data Range
         April 2018 - Present
@@ -102,27 +153,113 @@ def main():
         - ARIMA Predictions
         - SARIMAX Forecasting
         - Future Price Projections
+        
+        ### 💡 Tip
+        Use **Custom Ticker** mode to analyze any stock available on Yahoo Finance!
         """)
+        
+        st.markdown("---")
+        
+        # Connect section
+        st.subheader("🤝 Connect With Me")
+        
+        col_linkedin, col_github = st.columns(2)
+        
+        with col_linkedin:
+            st.markdown("""
+            <a href="https://www.linkedin.com/in/dominik-huffield" target="_blank" style="text-decoration: none;">
+                <div style="padding: 10px; background-color: #0077b5; border-radius: 5px; text-align: center; color: white; font-weight: bold;">
+                    🔗 LinkedIn
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        
+        with col_github:
+            st.markdown("""
+            <a href="https://github.com/cogentdom" target="_blank" style="text-decoration: none;">
+                <div style="padding: 10px; background-color: #333; border-radius: 5px; text-align: center; color: white; font-weight: bold;">
+                    💻 GitHub
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <p style="font-size: 12px; text-align: center; margin-top: 10px; color: #999;">
+        Built with ❤️ for data analysis and forecasting
+        </p>
+        """, unsafe_allow_html=True)
+    
+    # ============= DATA LOADING SECTION =============
+    # Cache data loading to improve performance
+    @st.cache_data(ttl=3600, show_spinner=False)  # Cache for 1 hour
+    def load_ticker_data(ticker_symbol, start_date, end_date):
+        """Load and cache ticker data"""
+        temp_mover = DataMover(start_date, end_date)
+        return temp_mover.load_data(ticker_symbol)
+    
+    # Load data for selected ticker
+    try:
+        # Display loading status
+        with st.spinner(f'📊 Loading data for {selected_ticker}...'):
+            data = load_ticker_data(selected_ticker, "2018-04-26", today)
+        
+        # Validate data
+        if data is None or len(data) == 0:
+            st.error(f"❌ No data available for ticker '{selected_ticker}'. Please check the symbol and try again.")
+            st.info("""
+            💡 **Troubleshooting Tips:**
+            - Make sure you're using a valid ticker symbol from Yahoo Finance
+            - Try popular tickers: AAPL, MSFT, GOOGL, AMZN, NVDA, META
+            - Some international tickers may need suffixes (e.g., VOD.L for London)
+            """)
+            st.stop()
+        
+    except Exception as e:
+        st.error(f"❌ Error loading data for ticker '{selected_ticker}'")
+        with st.expander("View Error Details"):
+            st.code(str(e))
+        st.info("""
+        💡 **Common Issues:**
+        - Ticker symbol doesn't exist on Yahoo Finance
+        - No data available for the specified date range (April 2018 - Present)
+        - Network connection problem
+        - Invalid ticker format
+        
+        **Try these popular tickers:** AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
+        """)
+        st.stop()
     
     # ============= MAIN DASHBOARD HEADER =============
     st.title("📈 Stock Market Analysis Dashboard")
+    
+    # Display key metrics in columns
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Selected Ticker", f"{selected_ticker}", help="Currently analyzing this stock")
+    with col2:
+        latest_price = data['Close'].iloc[-1] if 'Close' in data.columns and len(data) > 0 else 0
+        st.metric("Latest Price", f"${latest_price:.2f}", help="Most recent closing price")
+    with col3:
+        price_change = ((data['Close'].iloc[-1] - data['Close'].iloc[0]) / data['Close'].iloc[0] * 100) if len(data) > 1 else 0
+        st.metric("Total Change", f"{price_change:+.2f}%", delta=f"{price_change:+.2f}%", help="Price change over entire period")
+    with col4:
+        st.metric("Data Points", f"{len(data)}", help="Number of daily records")
+    
+    # Warning for limited data
+    if len(data) < 50:
+        st.warning(f"⚠️ Limited data available for {selected_ticker} ({len(data)} points). Analysis may be less accurate. Consider selecting a different ticker with more historical data.")
+    
     st.markdown(f"""
     ### Comprehensive Time Series Analysis for **{selected_ticker}**
     
-    This dashboard provides advanced technical analysis and forecasting for major tech stocks. 
+    This dashboard provides advanced technical analysis and forecasting for stocks. 
     Explore historical trends, statistical decomposition, predictive models, and future price projections 
     using state-of-the-art time series techniques including ARIMA, SARIMAX, and Exponential Smoothing.
     
-    **Current Selection:** `{selected_ticker}` | **Data Updated:** {today}
+    **Data Period:** April 2018 - {today} | **Analysis Type:** Biweekly Aggregation
     """)
     st.markdown("---")
     
-    # Load data for all tickers
-    all_data = {}
-    for ticker in ticker_list:
-        all_data[ticker] = mover.load_data(ticker)
-    
-    data = all_data[selected_ticker].copy()
     # %%
     def datetime_range(start=None, end=None):
         span = end - start
@@ -166,7 +303,7 @@ def main():
     
     The yearly breakdowns below reveal how volatility and trends evolved across different market conditions.
     """)
-    
+
     tripleGraph(thin_data['Close'], selected_ticker)
     st.markdown("---")
     # %%
@@ -823,6 +960,8 @@ def main():
     
     # ============= DASHBOARD FOOTER =============
     st.markdown("---")
+    
+    # About section
     st.markdown("""
     ### 📚 About This Dashboard
     
@@ -835,10 +974,58 @@ def main():
     **Data Source:** Yahoo Finance API via `yfinance`  
     **Analysis Period:** April 2018 - Present (biweekly aggregation)  
     **Models:** ARIMA(2,1,2), SARIMAX(1,1,1)(1,1,0,6), Holt-Winters Exponential Smoothing
-    
-    ---
-    *Dashboard built with Streamlit, Plotly, and Statsmodels*
     """)
+    
+    st.markdown("---")
+    
+    # Connect and attribution section
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <h3>🤝 Let's Connect!</h3>
+            <p>Interested in data science, finance, or time series analysis? Let's connect!</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Social media buttons
+        col_a, col_b, col_c = st.columns([1, 1, 1])
+        
+        with col_a:
+            st.markdown("")
+        
+        with col_b:
+            st.markdown("""
+            <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
+                <a href="https://www.linkedin.com/in/dominik-huffield" target="_blank" style="text-decoration: none;">
+                    <div style="padding: 12px 24px; background: linear-gradient(135deg, #0077b5 0%, #005885 100%); 
+                         border-radius: 8px; text-align: center; color: white; font-weight: bold; 
+                         box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                        🔗 LinkedIn
+                    </div>
+                </a>
+                <a href="https://github.com/cogentdom" target="_blank" style="text-decoration: none;">
+                    <div style="padding: 12px 24px; background: linear-gradient(135deg, #333 0%, #1a1a1a 100%); 
+                         border-radius: 8px; text-align: center; color: white; font-weight: bold; 
+                         box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                        💻 GitHub
+                    </div>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col_c:
+            st.markdown("")
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    <div style="text-align: center; padding: 20px; color: #999; font-size: 14px;">
+        <p>Dashboard built with ❤️ using Streamlit, Plotly, and Statsmodels</p>
+        <p style="font-size: 12px;">© 2026 - All Rights Reserved</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # %%
 if __name__ == '__main__':

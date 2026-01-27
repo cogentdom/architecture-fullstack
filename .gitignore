@@ -142,3 +142,11 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# Project specific
+# *.xls
+# *.xlsx
+volumeMountConf.txt
+
+# Documentation images (optional - remove if you want to commit images)
+# docs/images/
