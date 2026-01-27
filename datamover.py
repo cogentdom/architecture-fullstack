@@ -23,6 +23,9 @@ class DataMover:
 
     def load_data(self, ticker):
         df = yf.download(ticker, self.start, self.stop)
+        # Flatten MultiIndex columns if present (newer yfinance versions)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
         df.reset_index(inplace=True)
         df['Date'] = pd.to_datetime(df['Date'])
         return df
