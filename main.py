@@ -40,7 +40,27 @@ def main():
     plt.rc('hist', bins='auto')
     sns.set_context('notebook')
     sns.set_palette('gist_heat')
-    st.set_page_config(layout='wide')
+    st.set_page_config(
+        layout='wide',
+        page_title="Stock Analysis Dashboard",
+        page_icon="📈"
+    )
+    
+    # Define consistent color palette across all visualizations
+    COLOR_PALETTE = {
+        'primary': '#03fca5',      # Theme primary color
+        'close': '#1f77b4',        # Blue for Close price
+        'mean': '#2ca02c',         # Green for Mean/Rolling Mean
+        'std': '#ff7f0e',          # Orange for Std/Volatility
+        'volume': '#42a5f5',       # Light blue for Volume
+        'returns': '#ab47bc',      # Purple for Returns
+        'forecast': '#2ca02c',     # Green for forecasts
+        'residual': '#d62728',     # Red for residuals/errors
+        'trend': '#2ca02c',        # Green for trend
+        'seasonal': '#ff7f0e',     # Orange for seasonal
+        'observed': '#1f77b4'      # Blue for observed data
+    }
+    
     # %%
     today = date.today().strftime("%Y-%m-%d")
     mover = DataMover("2018-04-26", today)
@@ -50,14 +70,52 @@ def main():
     if 'selected_ticker' not in st.session_state:
         st.session_state.selected_ticker = ticker_list[0]
     
-    # Ticker selection dropdown
-    selected_ticker = st.selectbox(
-        "Select Ticker",
-        options=ticker_list,
-        index=ticker_list.index(st.session_state.selected_ticker),
-        key='ticker_selector'
-    )
-    st.session_state.selected_ticker = selected_ticker
+    # ============= SIDEBAR: TICKER SELECTION =============
+    with st.sidebar:
+        st.title("📊 Dashboard Controls")
+        st.markdown("---")
+        
+        st.subheader("Stock Selection")
+        selected_ticker = st.selectbox(
+            "Choose a stock ticker to analyze:",
+            options=ticker_list,
+            index=ticker_list.index(st.session_state.selected_ticker),
+            key='ticker_selector'
+        )
+        st.session_state.selected_ticker = selected_ticker
+        
+        st.markdown("---")
+        st.markdown("""
+        ### 📈 Available Tickers
+        - **AAPL** - Apple Inc.
+        - **GOOG** - Alphabet Inc.
+        - **MSFT** - Microsoft Corp.
+        - **TSLA** - Tesla Inc.
+        
+        ### 📅 Data Range
+        April 2018 - Present
+        
+        ### 🔄 Analysis Features
+        - Rolling Statistics
+        - Volume & Returns Analysis
+        - Seasonal Decomposition
+        - ARIMA Predictions
+        - SARIMAX Forecasting
+        - Future Price Projections
+        """)
+    
+    # ============= MAIN DASHBOARD HEADER =============
+    st.title("📈 Stock Market Analysis Dashboard")
+    st.markdown(f"""
+    ### Comprehensive Time Series Analysis for **{selected_ticker}**
+    
+    This dashboard provides advanced technical analysis and forecasting for major tech stocks. 
+    Explore historical trends, statistical decomposition, predictive models, and future price projections 
+    using state-of-the-art time series techniques including ARIMA, SARIMAX, and Exponential Smoothing.
+    
+    **Current Selection:** `{selected_ticker}` | **Data Updated:** {today}
+    """)
+    st.markdown("---")
     
     # Load data for all tickers
     all_data = {}
@@ -97,9 +155,34 @@ def main():
         with col3:
             st.line_chart(df['2020-04-28':'2021-04-28'], width=200)
 
+    # ============= SECTION 1: ROLLING STATISTICS =============
+    st.header("📊 Section 1: Rolling Statistics Analysis")
+    st.markdown("""
+    **Purpose:** Understand price trends and volatility over time using rolling windows.
+    
+    - **Close Price:** Raw closing price data (biweekly aggregated)
+    - **Rolling Mean (12-period):** Smoothed trend line revealing long-term direction
+    - **Rolling Std (12-period):** Volatility indicator showing price stability
+    
+    The yearly breakdowns below reveal how volatility and trends evolved across different market conditions.
+    """)
+    
     tripleGraph(thin_data['Close'], selected_ticker)
-    # st.altair_chart([thin_data['Close'] | thin_data['Close'].rolling(window = 12).mean().dropna()])
+    st.markdown("---")
     # %%
+    # ============= SECTION 2: TRADING ACTIVITY & VOLATILITY =============
+    st.header("💹 Section 2: Trading Activity & Volatility Analysis")
+    st.markdown("""
+    **Purpose:** Examine trading patterns, return distributions, and market volatility.
+    
+    - **Trading Volume:** Shows market activity and liquidity trends over time
+    - **Daily Returns Distribution:** Histogram revealing the probability distribution of daily percentage changes
+    - **Price Change vs Volume:** Correlation between trading volume and price movements (green = gains, red = losses)
+    - **Rolling Volatility (30-day):** Standard deviation of returns indicating market risk and uncertainty
+    
+    Higher volatility periods often coincide with major market events or company announcements.
+    """)
+    
     # Create volume and daily returns analysis chart
     fig = make_subplots(
         rows=2, cols=2,
@@ -122,23 +205,23 @@ def main():
     daily_data['Volatility'] = daily_data['Returns'].rolling(window=30).std()
     daily_data = daily_data.dropna()
     
-    # 1. Volume over time (bar chart)
+    # 1. Volume over time (bar chart) - use consistent color
     fig.add_trace(
         go.Bar(
             x=thin_data.index,
             y=thin_data['Volume'],
-            marker_color='#42a5f5',
+            marker_color=COLOR_PALETTE['volume'],
             name='Volume'
         ),
         row=1, col=1
     )
     
-    # 2. Daily returns histogram
+    # 2. Daily returns histogram - use consistent color
     fig.add_trace(
         go.Histogram(
             x=daily_data['Returns'],
             nbinsx=50,
-            marker_color='#ab47bc',
+            marker_color=COLOR_PALETTE['returns'],
             name='Returns %'
         ),
         row=1, col=2
@@ -161,13 +244,13 @@ def main():
         row=2, col=1
     )
     
-    # 4. Rolling volatility
+    # 4. Rolling volatility - use consistent color for volatility/std
     fig.add_trace(
         go.Scatter(
             x=daily_data.index,
             y=daily_data['Volatility'],
             mode='lines',
-            line=dict(color='#ffa726', width=2),
+            line=dict(color=COLOR_PALETTE['std'], width=2),
             name='Volatility'
         ),
         row=2, col=2
@@ -190,8 +273,24 @@ def main():
     fig.update_yaxes(title_text='Volatility %', row=2, col=2)
 
     st.plotly_chart(fig, key="volume-analysis-chart", use_container_width=True)
+    st.markdown("---")
     
     # %%
+    # ============= SECTION 3: SEASONAL DECOMPOSITION =============
+    st.header("🔄 Section 3: Seasonal Decomposition")
+    st.markdown("""
+    **Purpose:** Break down the time series into fundamental components to understand underlying patterns.
+    
+    - **Observed:** The original closing price data as recorded
+    - **Trend:** Long-term direction of the stock price, removing short-term fluctuations
+    - **Seasonal:** Repeating patterns that occur at regular intervals (cyclical market behavior)
+    - **Residual:** Random noise and irregular variations not explained by trend or seasonality
+    
+    This decomposition uses an additive model where: **Observed = Trend + Seasonal + Residual**
+    
+    A good model should show clear trend and seasonal components with minimal, random residuals.
+    """)
+    
     # Seasonal Decomposition using Plotly
     decomp = sm.tsa.seasonal_decompose(thin_data['Close'], model='additive', extrapolate_trend='freq', period=6)
     
@@ -204,22 +303,22 @@ def main():
     
     decomp_plotly.add_trace(
         go.Scatter(x=thin_data.index, y=thin_data['Close'], mode='lines', 
-                   line=dict(color='#1f77b4', width=2), name='Observed'),
+                   line=dict(color=COLOR_PALETTE['observed'], width=2), name='Observed'),
         row=1, col=1
     )
     decomp_plotly.add_trace(
         go.Scatter(x=thin_data.index, y=decomp.trend, mode='lines',
-                   line=dict(color='#2ca02c', width=2), name='Trend'),
+                   line=dict(color=COLOR_PALETTE['trend'], width=2), name='Trend'),
         row=2, col=1
     )
     decomp_plotly.add_trace(
         go.Scatter(x=thin_data.index, y=decomp.seasonal, mode='lines',
-                   line=dict(color='#ff7f0e', width=2), name='Seasonal'),
+                   line=dict(color=COLOR_PALETTE['seasonal'], width=2), name='Seasonal'),
         row=3, col=1
     )
     decomp_plotly.add_trace(
         go.Scatter(x=thin_data.index, y=decomp.resid, mode='markers',
-                   marker=dict(color='#d62728', size=5), name='Residual'),
+                   marker=dict(color=COLOR_PALETTE['residual'], size=5), name='Residual'),
         row=4, col=1
     )
     
@@ -232,9 +331,26 @@ def main():
     decomp_plotly.update_xaxes(title_text='Date', row=4, col=1)
     
     st.plotly_chart(decomp_plotly, key="seasonal-decomp-chart", use_container_width=True)
+    st.markdown("---")
     # %%
-    # ARIMA Predictions using Plotly
-    st.subheader(f"📉 ARIMA Model Predictions - {selected_ticker}")
+    # ============= SECTION 4: ARIMA MODEL PREDICTIONS =============
+    st.header("📉 Section 4: ARIMA Model Predictions")
+    st.markdown("""
+    **Purpose:** Validate statistical forecasting models by comparing predictions against actual historical data.
+    
+    **ARIMA** (AutoRegressive Integrated Moving Average) is a classical statistical method for time series forecasting:
+    - **AutoRegressive (AR):** Uses past values to predict future values
+    - **Integrated (I):** Differences the data to achieve stationarity
+    - **Moving Average (MA):** Uses past forecast errors in the prediction
+    
+    This section shows:
+    - **Historical data** (faded lines): The actual observed values for Close Price, Rolling Mean, and Rolling Std
+    - **ARIMA predictions** (bold lines): Model forecasts for the last 20 periods to assess prediction accuracy
+    
+    Matching colors indicate the same metric: Blue = Close Price, Green = Rolling Mean, Orange = Rolling Std
+    """)
+    
+    st.subheader(f"ARIMA Model Predictions - {selected_ticker}")
     
     indx = thin_data.index
     start_pred = indx[-20]
@@ -253,46 +369,41 @@ def main():
     arima_std_model = ARIMA(rolling_std[:-20], order=(1,1,1)).fit(method_kwargs={'maxiter': 500})
     pred_std = arima_std_model.predict(start_pred, end_pred)
     
-    # Create Plotly figure
+    # Create Plotly figure with consistent colors
     fig_arima = go.Figure()
     
-    # Define matching colors for historical and predicted
-    color_close = '#1f77b4'  # Blue
-    color_mean = '#2ca02c'   # Green
-    color_std = '#ff7f0e'    # Orange
-    
-    # Historical data (semi-transparent)
+    # Historical data (semi-transparent) - using consistent color palette
     fig_arima.add_trace(go.Scatter(
         x=thin_data.index, y=thin_data['Close'],
         mode='lines', name='Close Price',
-        line=dict(color=color_close, width=1.5), opacity=0.5
+        line=dict(color=COLOR_PALETTE['close'], width=1.5), opacity=0.5
     ))
     fig_arima.add_trace(go.Scatter(
         x=rolling_mean.index, y=rolling_mean.values,
         mode='lines', name='Rolling Mean',
-        line=dict(color=color_mean, width=1.5), opacity=0.5
+        line=dict(color=COLOR_PALETTE['mean'], width=1.5), opacity=0.5
     ))
     fig_arima.add_trace(go.Scatter(
         x=rolling_std.index, y=rolling_std.values,
         mode='lines', name='Rolling Std',
-        line=dict(color=color_std, width=1.5), opacity=0.5
+        line=dict(color=COLOR_PALETTE['std'], width=1.5), opacity=0.5
     ))
     
     # Predicted values (same colors, bolder solid line)
     fig_arima.add_trace(go.Scatter(
         x=pred.index, y=pred.values,
         mode='lines', name='Predicted Close',
-        line=dict(color=color_close, width=3)
+        line=dict(color=COLOR_PALETTE['close'], width=3)
     ))
     fig_arima.add_trace(go.Scatter(
         x=pred_mean.index, y=pred_mean.values,
         mode='lines', name='Predicted Mean',
-        line=dict(color=color_mean, width=3)
+        line=dict(color=COLOR_PALETTE['mean'], width=3)
     ))
     fig_arima.add_trace(go.Scatter(
         x=pred_std.index, y=pred_std.values,
         mode='lines', name='Predicted Std',
-        line=dict(color=color_std, width=3)
+        line=dict(color=COLOR_PALETTE['std'], width=3)
     ))
     
     fig_arima.update_layout(
@@ -306,10 +417,25 @@ def main():
     )
     
     st.plotly_chart(fig_arima, key="arima-predictions-chart", use_container_width=True)
+    st.markdown("---")
     
     # %%
-    # Time Series Forecasting with SARIMAX (from timeseries_analysis.ipynb)
-    st.header(f"📈 Time Series Forecasting Analysis - {selected_ticker}")
+    # ============= SECTION 5: SARIMAX FORECASTING ANALYSIS =============
+    st.header(f"📈 Section 5: Advanced Time Series Forecasting (SARIMAX)")
+    st.markdown("""
+    **Purpose:** Apply advanced seasonal forecasting techniques and validate model performance.
+    
+    **SARIMAX** (Seasonal ARIMA with eXogenous variables) extends ARIMA to handle seasonal patterns:
+    - Accounts for repeating patterns at fixed intervals
+    - Provides confidence intervals for uncertainty quantification
+    - Enables rigorous model diagnostics
+    
+    This comprehensive analysis includes:
+    1. **Model Diagnostics:** Validates that our model assumptions are met
+    2. **Forecast Validation:** Compares predictions against actual data
+    3. **Accuracy Metrics:** Quantifies prediction errors (MSE, RMSE, MAE, MAPE)
+    4. **Future Forecasting:** Projects prices beyond the historical data
+    """)
     
     # Prepare data for SARIMAX model
     y_series = thin_data['Close'].dropna()
@@ -331,13 +457,15 @@ def main():
         results = mod.fit(disp=False, maxiter=500)
         
         # 1. ARIMA Model Diagnostics Plot
-        st.subheader("🔍 SARIMAX Model Diagnostics")
+        st.subheader("🔍 Model Diagnostics")
         st.markdown("""
-        Model diagnostics help validate our forecasting model. The plots below show:
-        - **Standardized Residuals**: Should show no patterns
-        - **Histogram**: Residuals should be normally distributed  
-        - **Q-Q Plot**: Points should follow the diagonal line
-        - **Correlogram**: Autocorrelation should be near zero
+        **Diagnostic checks ensure model validity:**
+        - **Standardized Residuals:** Should fluctuate randomly around zero with no patterns (indicating good model fit)
+        - **Histogram + Normal Curve:** Residuals should approximate a normal distribution (bell curve)
+        - **Q-Q Plot:** Points should closely follow the diagonal line (confirms normality assumption)
+        - **Correlogram (ACF):** Bars should stay within confidence bands (no remaining autocorrelation)
+        
+        If diagnostics look good, we can trust the model's forecasts. Systematic patterns in residuals suggest room for improvement.
         """)
         
         # Get standardized residuals
@@ -362,18 +490,18 @@ def main():
             go.Scatter(
                 x=std_residuals.index, y=std_residuals.values,
                 mode='lines', name='Std Residuals',
-                line=dict(color='#1f77b4', width=1)
+                line=dict(color=COLOR_PALETTE['close'], width=1)
             ),
             row=1, col=1
         )
-        diag_fig.add_hline(y=0, line_dash="dash", line_color="red", row=1, col=1)
+        diag_fig.add_hline(y=0, line_dash="dash", line_color=COLOR_PALETTE['residual'], row=1, col=1)
         
         # 2. Histogram with KDE (top-right)
         diag_fig.add_trace(
             go.Histogram(
                 x=std_residuals.values, nbinsx=30,
                 name='Residuals', opacity=0.7,
-                marker_color='#1f77b4',
+                marker_color=COLOR_PALETTE['close'],
                 histnorm='probability density'
             ),
             row=1, col=2
@@ -386,7 +514,7 @@ def main():
             go.Scatter(
                 x=x_range, y=normal_curve,
                 mode='lines', name='N(0,1)',
-                line=dict(color='#ff7f0e', width=2)
+                line=dict(color=COLOR_PALETTE['std'], width=2)
             ),
             row=1, col=2
         )
@@ -400,7 +528,7 @@ def main():
             go.Scatter(
                 x=theoretical_quantiles, y=sorted_residuals,
                 mode='markers', name='Sample Quantiles',
-                marker=dict(color='#1f77b4', size=5)
+                marker=dict(color=COLOR_PALETTE['close'], size=5)
             ),
             row=2, col=1
         )
@@ -412,7 +540,7 @@ def main():
             go.Scatter(
                 x=[qq_min, qq_max], y=[qq_min, qq_max],
                 mode='lines', name='Reference',
-                line=dict(color='#d62728', width=2, dash='dash')
+                line=dict(color=COLOR_PALETTE['residual'], width=2, dash='dash')
             ),
             row=2, col=1
         )
@@ -425,14 +553,14 @@ def main():
         diag_fig.add_trace(
             go.Bar(
                 x=lags, y=acf_values,
-                name='ACF', marker_color='#1f77b4'
+                name='ACF', marker_color=COLOR_PALETTE['close']
             ),
             row=2, col=2
         )
         
         # Add confidence interval lines
-        diag_fig.add_hline(y=conf_interval, line_dash="dash", line_color="red", row=2, col=2)
-        diag_fig.add_hline(y=-conf_interval, line_dash="dash", line_color="red", row=2, col=2)
+        diag_fig.add_hline(y=conf_interval, line_dash="dash", line_color=COLOR_PALETTE['residual'], row=2, col=2)
+        diag_fig.add_hline(y=-conf_interval, line_dash="dash", line_color=COLOR_PALETTE['residual'], row=2, col=2)
         diag_fig.add_hline(y=0, line_dash="solid", line_color="gray", row=2, col=2)
         
         # Update layout
@@ -461,6 +589,13 @@ def main():
         
         # 2. Forecast Validation - One-step ahead predictions with confidence intervals
         st.subheader("🎯 Forecast Validation")
+        st.markdown("""
+        **One-step ahead forecasting** tests model accuracy by predicting each point using only prior data.
+        The shaded confidence interval shows the range where we expect true values with 95% probability.
+        
+        Ideally, the orange forecast line should closely track the blue observed line, with actual values
+        falling within the confidence bands.
+        """)
         
         # Get predictions for the last portion of data using integer indices
         split_point = len(y_series) - 20 if len(y_series) > 20 else len(y_series) // 2
@@ -471,21 +606,21 @@ def main():
         # Map the prediction index back to dates
         pred_dates = y_series.index[split_point:]
         
-        # Create validation plot using Plotly
+        # Create validation plot using Plotly with consistent colors
         fig_validation = go.Figure()
         
-        # Plot observed data
+        # Plot observed data (blue - observed)
         fig_validation.add_trace(go.Scatter(
             x=y_series.index, y=y_series.values,
             mode='lines', name='Observed',
-            line=dict(color='#1f77b4', width=2)
+            line=dict(color=COLOR_PALETTE['observed'], width=2)
         ))
         
-        # Plot one-step ahead forecast (use pred_dates for x-axis)
+        # Plot one-step ahead forecast (orange - std/volatility color for forecast uncertainty)
         fig_validation.add_trace(go.Scatter(
             x=pred_dates, y=pred.predicted_mean.values,
             mode='lines', name='One-step ahead Forecast',
-            line=dict(color='#ff7f0e', width=2)
+            line=dict(color=COLOR_PALETTE['std'], width=2)
         ))
         
         # Add confidence interval (upper bound)
@@ -496,13 +631,13 @@ def main():
             showlegend=False
         ))
         
-        # Add confidence interval (lower bound with fill)
+        # Add confidence interval (lower bound with fill) - matching forecast color
         fig_validation.add_trace(go.Scatter(
             x=pred_dates, y=pred_ci.iloc[:, 0].values,
             mode='lines', name='95% Confidence Interval',
             line=dict(width=0),
             fill='tonexty',
-            fillcolor='rgba(255, 127, 14, 0.2)'
+            fillcolor='rgba(255, 127, 14, 0.2)'  # Orange with transparency
         ))
         
         fig_validation.update_layout(
@@ -529,15 +664,22 @@ def main():
             
             # Display metrics in columns
             st.subheader("📊 Forecast Accuracy Metrics")
+            st.markdown("""
+            These metrics quantify prediction accuracy. Lower values indicate better performance:
+            - **MSE/RMSE:** Penalizes large errors more heavily
+            - **MAE:** Average absolute prediction error in dollars
+            - **MAPE:** Average percentage error (scale-independent)
+            """)
+            
             col1, col2, col3, col4 = st.columns(4)
             with col1:
-                st.metric("Mean Squared Error", f"{mse:,.2f}")
+                st.metric("Mean Squared Error", f"{mse:,.2f}", help="Average of squared prediction errors")
             with col2:
-                st.metric("Root MSE", f"${rmse:,.2f}")
+                st.metric("Root MSE", f"${rmse:,.2f}", help="Square root of MSE, in original units")
             with col3:
-                st.metric("Mean Absolute Error", f"${mae:,.2f}")
+                st.metric("Mean Absolute Error", f"${mae:,.2f}", help="Average absolute prediction error")
             with col4:
-                st.metric("MAPE", f"{mape:.2f}%")
+                st.metric("MAPE", f"{mape:.2f}%", help="Mean Absolute Percentage Error")
         
         # Add model summary in expander
         with st.expander("📋 View SARIMAX Model Summary"):
@@ -548,6 +690,18 @@ def main():
     
     # 4. Future Forecast with Uncertainty Bounds (using Exponential Smoothing)
     st.subheader("🔮 Future Price Forecast")
+    st.markdown("""
+    **Purpose:** Project stock prices into the future using Holt-Winters Exponential Smoothing.
+    
+    This method is ideal for data with trends and seasonality:
+    - **Historical (blue line):** Actual past prices
+    - **Fitted (orange dotted):** Model's fit to historical data
+    - **Forecast (green dashed):** Projected future prices
+    - **Confidence Interval (green shaded):** 95% probability range for future values
+    
+    The vertical line marks where historical data ends and forecasts begin. The widening confidence
+    interval reflects increasing uncertainty further into the future.
+    """)
     
     try:
         from statsmodels.tsa.holtwinters import ExponentialSmoothing
@@ -582,29 +736,29 @@ def main():
         ci_lower = forecast_values - 1.96 * residual_std * ci_multipliers
         ci_upper = forecast_values + 1.96 * residual_std * ci_multipliers
         
-        # Create future forecast plot using Plotly
+        # Create future forecast plot using Plotly with consistent colors
         fig_forecast = go.Figure()
         
-        # Plot historical data
+        # Plot historical data (blue - consistent with observed)
         fig_forecast.add_trace(go.Scatter(
             x=hist_dates, y=hist_values,
             mode='lines', name='Historical',
-            line=dict(color='#1f77b4', width=2)
+            line=dict(color=COLOR_PALETTE['observed'], width=2)
         ))
         
-        # Plot fitted values
+        # Plot fitted values (orange - consistent with volatility/uncertainty)
         fig_forecast.add_trace(go.Scatter(
             x=hist_dates, y=fitted_model.fittedvalues,
             mode='lines', name='Fitted',
-            line=dict(color='#ff7f0e', width=1, dash='dot'),
+            line=dict(color=COLOR_PALETTE['std'], width=1, dash='dot'),
             opacity=0.7
         ))
         
-        # Plot forecast
+        # Plot forecast (green - consistent with forecast/trend)
         fig_forecast.add_trace(go.Scatter(
             x=future_dates, y=forecast_values,
             mode='lines', name='Forecast',
-            line=dict(color='#2ca02c', width=2, dash='dash')
+            line=dict(color=COLOR_PALETTE['forecast'], width=2, dash='dash')
         ))
         
         # Add uncertainty bounds (upper)
@@ -615,13 +769,13 @@ def main():
             showlegend=False
         ))
         
-        # Add uncertainty bounds (lower with fill)
+        # Add uncertainty bounds (lower with fill) - green matching forecast
         fig_forecast.add_trace(go.Scatter(
             x=future_dates, y=ci_lower,
             mode='lines', name='95% Confidence Interval',
             line=dict(width=0),
             fill='tonexty',
-            fillcolor='rgba(44, 160, 44, 0.2)'
+            fillcolor='rgba(44, 160, 44, 0.2)'  # Green with transparency
         ))
         
         # Add a vertical line to separate historical from forecast
@@ -666,6 +820,25 @@ def main():
     except Exception as e:
         st.warning(f"Could not generate forecast: {str(e)}")
         st.info("The forecast model encountered an issue with this data.")
+    
+    # ============= DASHBOARD FOOTER =============
+    st.markdown("---")
+    st.markdown("""
+    ### 📚 About This Dashboard
+    
+    This comprehensive stock analysis dashboard combines multiple advanced time series techniques:
+    - **Statistical Decomposition** to understand underlying patterns
+    - **ARIMA/SARIMAX Models** for rigorous forecasting with uncertainty quantification
+    - **Exponential Smoothing** for trend and seasonal projections
+    - **Model Diagnostics** to ensure prediction reliability
+    
+    **Data Source:** Yahoo Finance API via `yfinance`  
+    **Analysis Period:** April 2018 - Present (biweekly aggregation)  
+    **Models:** ARIMA(2,1,2), SARIMAX(1,1,1)(1,1,0,6), Holt-Winters Exponential Smoothing
+    
+    ---
+    *Dashboard built with Streamlit, Plotly, and Statsmodels*
+    """)
 
 # %%
 if __name__ == '__main__':
