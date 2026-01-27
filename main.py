@@ -23,7 +23,7 @@ import mplfinance as mpf
 # %%
 def main():
     # %%
-    plt.style.use('seaborn-darkgrid')
+    plt.style.use('seaborn-v0_8-darkgrid')
     plt.rc('patch', force_edgecolor=True,edgecolor='black')
     plt.rc('hist', bins='auto')
     sns.set_context('notebook')
@@ -48,7 +48,8 @@ def main():
     thin_data = data.resample('2w').mean()
     # %%
     mplot = ModelPlot()
-    mplot.decomp_plot(thin_data['Close'])
+    decomp_fig = mplot.decomp_plot(thin_data['Close'])
+    st.pyplot(decomp_fig)
     
     def tripleGraph(data):
         chart1 = data
@@ -61,7 +62,7 @@ def main():
         st.title('Rolling value decomposition on Apple stock')
         st.line_chart(df, width=800)
 
-        col1, col2, col3 = st.beta_columns(3)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.line_chart(df['2018-04-28':'2019-04-28'], width=200)
         with col2:

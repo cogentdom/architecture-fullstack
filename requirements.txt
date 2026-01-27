@@ -1,11 +1,27 @@
-pandas~=1.2.4
-seaborn~=0.11.1
-yfinance~=0.1.59
-plotly~=4.14.3
-streamlit~=0.80.0
-mplfinance~=0.12.7a17
-statsmodels~=0.12.2
+# Core dependencies - pinned for compatibility
+# Python 3.8+ required
 
+# Data & Analysis
+pandas==2.0.3
+numpy==1.22.4
+scipy==1.7.3
+statsmodels==0.14.1
+
+# Visualization
+matplotlib==3.7.5
+seaborn==0.11.2
+plotly==6.5.2
+mplfinance==0.12.10b0
+
+# Finance Data
+yfinance==1.1.0
+
+# Web App
+streamlit==1.40.1
+click==7.1.2
+protobuf==3.20.3
+
+# Jupyter (for development notebooks)
 jupyter==1.0.0
 ipywidgets==7.6.3
 notebook==6.4.0
