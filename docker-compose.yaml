@@ -1,11 +1,15 @@
 version: "3"
 
 services:
-  dashboard-report:
-    image: dashboard:v0
-    container_name: dashboard-report
+  stock-forecast-report:
+    image: stock-forecast:v0
+    container_name: stock-forecast-report
     build: .
     ports:
       - 8501:8501
     restart: on-failure
+    network_mode: bridge
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 

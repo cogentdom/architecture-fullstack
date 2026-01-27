@@ -11,6 +11,12 @@ import seaborn as sns
 import json
 # from statsmodels.tsa.arima_model import ARIMA  # Depricated
 from statsmodels.tsa.arima.model import ARIMA
+import time
+import warnings
+
+# Suppress yfinance warnings that don't affect functionality
+warnings.filterwarnings('ignore', category=FutureWarning, module='yfinance')
+warnings.filterwarnings('ignore', message='.*possibly delisted.*')
 
 # %%
 class DataMover:
@@ -22,13 +28,86 @@ class DataMover:
         self.stop = stop
 
     def load_data(self, ticker):
-        df = yf.download(ticker, self.start, self.stop)
-        # Flatten MultiIndex columns if present (newer yfinance versions)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        df.reset_index(inplace=True)
-        df['Date'] = pd.to_datetime(df['Date'])
-        return df
+        # Try multiple approaches for better reliability in Docker containers
+        max_retries = 3
+        retry_delay = 3
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Attempt {attempt + 1}/{max_retries} to fetch data for {ticker}")
+                
+                # Approach 1: Use download method with better parameters
+                # This is more reliable than Ticker.history() in many cases
+                df = yf.download(
+                    ticker, 
+                    start=self.start, 
+                    end=self.stop,
+                    progress=False,
+                    auto_adjust=True,  # Automatically adjust prices for splits/dividends
+                    prepost=False,  # Don't include pre/post market data
+                    threads=False  # Disable threading for reliability
+                )
+                
+                if not df.empty:
+                    print(f"Successfully fetched {len(df)} rows for {ticker}")
+                    # Flatten MultiIndex columns if present
+                    if isinstance(df.columns, pd.MultiIndex):
+                        df.columns = df.columns.get_level_values(0)
+                    df.reset_index(inplace=True)
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    
+                    # Validate that we have the required columns
+                    required_cols = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                    missing_cols = [col for col in required_cols if col not in df.columns]
+                    if missing_cols:
+                        print(f"Warning: Missing columns {missing_cols}, but continuing...")
+                    
+                    return df
+                
+                print(f"Download returned empty data on attempt {attempt + 1}")
+                
+                # If download failed, try Ticker object as fallback
+                print(f"Trying Ticker.history() as fallback...")
+                ticker_obj = yf.Ticker(ticker)
+                df = ticker_obj.history(start=self.start, end=self.stop)
+                
+                if not df.empty:
+                    print(f"Successfully fetched {len(df)} rows via Ticker.history()")
+                    df.reset_index(inplace=True)
+                    df['Date'] = pd.to_datetime(df['Date'])
+                    return df
+                
+                print(f"Both methods returned empty data on attempt {attempt + 1}")
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"Error on attempt {attempt + 1}: {error_msg}")
+                
+                # If it's a JSON decode error, it might be a temporary Yahoo Finance issue
+                if "Expecting value" in error_msg or "JSON" in error_msg:
+                    print("Detected JSON parsing error - Yahoo Finance may be temporarily unavailable")
+                
+                if attempt < max_retries - 1:
+                    print(f"Waiting {retry_delay} seconds before retry...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # On final attempt, raise a more informative error
+                    raise ValueError(
+                        f"Failed to download data for '{ticker}' after {max_retries} attempts. "
+                        f"This could be due to:\n"
+                        f"  1. Invalid ticker symbol\n"
+                        f"  2. Yahoo Finance API temporarily unavailable\n"
+                        f"  3. Network connectivity issues\n"
+                        f"  4. Ticker delisted or no data for date range\n"
+                        f"Last error: {error_msg}"
+                    )
+        
+        # If we got here, data is empty after all retries
+        raise ValueError(
+            f"No data available for ticker '{ticker}' between {self.start} and {self.stop}. "
+            f"Please verify the ticker symbol exists on Yahoo Finance and has historical data for this date range."
+        )
 
     def load_datas(self, ticker_list):
         train = []
