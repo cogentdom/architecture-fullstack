@@ -39,7 +39,7 @@ This platform provides comprehensive time series analysis and forecasting for fi
 - **Real-time Updates**: Dynamic data refresh on selection changes
 
 ### 🏗️ Architecture & Deployment
-- **Dockerized Application**: Multi-container setup with Nginx reverse proxy
+- **Dockerized Application**: Containerized setup for easy deployment
 - **AWS EC2 Deployment**: Production-ready cloud infrastructure
 - **Custom Domain**: Cloudflare DNS integration for professional access
 - **Data Persistence**: Volume mounting for environment consistency
@@ -85,8 +85,7 @@ docker-compose up --build
 ```
 
 2. **Access the application**
-- Dashboard: `http://localhost`
-- Direct access: `http://localhost:8501`
+- Dashboard: `http://localhost:8501`
 
 ### Using the Makefile
 
@@ -109,10 +108,8 @@ architecture-fullstack/
 ├── datamover.py           # Data fetching and preprocessing utilities
 ├── requirements.txt       # Python dependencies
 ├── Dockerfile            # Container image definition
-├── docker-compose.yaml   # Multi-container orchestration
+├── docker-compose.yaml   # Container orchestration
 ├── Makefile             # Build and deployment automation
-├── reverse_proxy/       
-│   └── nginx.conf       # Nginx configuration
 ├── dev_folder/          # Development notebooks and data
 │   ├── dev_notebook.ipynb
 │   └── timeseries_analysis.ipynb
@@ -140,8 +137,7 @@ architecture-fullstack/
 
 ### DevOps & Infrastructure
 - **Docker**: Containerization platform
-- **Docker Compose**: Multi-container orchestration
-- **Nginx**: Reverse proxy and load balancer
+- **Docker Compose**: Container orchestration
 - **AWS EC2**: Cloud compute instance
 - **Cloudflare**: DNS and CDN services
 
@@ -176,11 +172,6 @@ Set the number of days to forecast into the future (1-90 days).
 │   User Browser  │
 └────────┬────────┘
          │
-    ┌────▼────┐
-    │  Nginx  │ (Port 80)
-    │  Proxy  │
-    └────┬────┘
-         │
     ┌────▼────────┐
     │  Streamlit  │ (Port 8501)
     │  Dashboard  │
@@ -197,7 +188,7 @@ Set the number of days to forecast into the future (1-90 days).
 2. **Processing**: Data cleaning, transformation, and feature engineering
 3. **Analysis**: Statistical analysis and ARIMA model training
 4. **Visualization**: Interactive charts rendered in Streamlit
-5. **Deployment**: Containerized application served via Nginx
+5. **Deployment**: Containerized application ready for cloud deployment
 
 ## 🌐 Deployment to AWS
 
@@ -206,7 +197,7 @@ Set the number of days to forecast into the future (1-90 days).
 1. **Launch EC2 Instance**
    - AMI: Ubuntu 20.04 LTS
    - Instance Type: t2.micro or larger
-   - Security Group: Open ports 80, 443, 8501
+   - Security Group: Open port 8501
 
 2. **Install Docker**
 ```bash
@@ -224,7 +215,6 @@ docker-compose up -d
 
 4. **Configure Domain** (Optional)
    - Point your domain to the EC2 instance IP in Cloudflare DNS
-   - Update Nginx configuration for your domain name
 
 ## 🧪 Development
 

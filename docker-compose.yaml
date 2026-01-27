@@ -1,16 +1,6 @@
 version: "3"
 
 services:
-  reverse-proxy:
-    image: nginx:1.17.10
-    container_name: reverse_proxy_demo
-    depends_on:
-      - dashboard-report
-    volumes:
-      - ./reverse_proxy/nginx.conf:/etc/nginx/nginx.conf
-    ports:
-      - 80:80
-
   dashboard-report:
     image: dashboard:v0
     container_name: dashboard-report

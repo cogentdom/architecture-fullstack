@@ -62,8 +62,8 @@ We take the security of our project seriously. If you believe you have found a s
 ### Essential
 1. **HTTPS/SSL**: 
    - Use Let's Encrypt for free SSL certificates
-   - Configure Nginx with SSL termination
-   - Redirect all HTTP traffic to HTTPS
+   - Use Cloudflare for SSL termination
+   - Configure Streamlit with SSL certificates if needed
 
 2. **Authentication**:
    - Implement user authentication (OAuth, JWT)
@@ -90,9 +90,9 @@ We take the security of our project seriously. If you believe you have found a s
    - Use minimal base images (alpine, slim)
 
 6. **Network Security**:
-   - Implement rate limiting (Nginx or application level)
+   - Implement rate limiting at application level
    - Use fail2ban for brute force protection
-   - Consider WAF (Web Application Firewall)
+   - Consider WAF (Web Application Firewall) via Cloudflare
 
 7. **Secrets Management**:
    - Use AWS Secrets Manager or HashiCorp Vault

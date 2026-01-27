@@ -36,10 +36,8 @@ Project Structure (Documentation Focus)
 │
 ├── 🐳 DOCKER & DEPLOYMENT
 │   ├── Dockerfile                    📦 Container image definition
-│   ├── docker-compose.yaml           🎼 Multi-container orchestration
-│   ├── Makefile                      🔧 Build automation
-│   └── 📂 reverse_proxy/
-│       └── nginx.conf                ⚙️ Nginx configuration
+│   ├── docker-compose.yaml           🎼 Container orchestration
+│   └── Makefile                      🔧 Build automation
 │
 └── 📂 dev_folder/                    Development & research
     ├── dev_notebook.ipynb            🧪 Experimentation

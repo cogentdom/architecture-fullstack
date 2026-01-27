@@ -115,14 +115,12 @@ docker build -t dashboard:v0 .
 docker-compose up -d
 ```
 
-This starts two containers:
-- **nginx** (reverse-proxy): Port 80
+This starts the container:
 - **streamlit** (dashboard-report): Port 8501
 
 ### Step 3: Access the Application
 
-- **Via Nginx**: http://localhost
-- **Direct**: http://localhost:8501
+- Dashboard: http://localhost:8501
 
 ### Step 4: View Logs
 
@@ -185,9 +183,7 @@ docker system prune -a
 | Type  | Protocol | Port Range | Source    | Description          |
 |-------|----------|------------|-----------|----------------------|
 | SSH   | TCP      | 22         | Your IP   | SSH access           |
-| HTTP  | TCP      | 80         | 0.0.0.0/0 | HTTP access          |
-| HTTPS | TCP      | 443        | 0.0.0.0/0 | HTTPS access         |
-| Custom| TCP      | 8501       | 0.0.0.0/0 | Direct Streamlit     |
+| Custom| TCP      | 8501       | 0.0.0.0/0 | Streamlit access     |
 
 4. **Create/Select Key Pair** for SSH access
 5. **Launch Instance**
@@ -246,7 +242,7 @@ docker-compose logs
 curl http://localhost:8501
 
 # From your browser
-# Visit: http://your-instance-public-ip
+# Visit: http://your-instance-public-ip:8501
 ```
 
 ### Step 6: Configure Auto-Start
@@ -313,41 +309,8 @@ A    www  12.34.56.78    Proxied
 
 1. Go to SSL/TLS settings
 2. Set mode to "Flexible" (Cloudflare to browser only)
-3. Or "Full" if you configure SSL on EC2
 
-#### Step 4: Update Nginx Configuration
-
-```bash
-cd architecture-fullstack/reverse_proxy
-nano nginx.conf
-```
-
-Update server_name:
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    
-    location / {
-        proxy_pass http://dashboard-report:8501;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Restart containers:
-
-```bash
-docker-compose down
-docker-compose up -d
-```
+Note: Direct access to Streamlit on port 8501. For SSL termination, consider using Cloudflare's proxy service.
 
 ### Option 2: AWS Route 53
 
@@ -387,90 +350,26 @@ Update DNS records with the Elastic IP.
 
 ## 🔒 SSL/HTTPS Configuration
 
-### Using Let's Encrypt (Recommended)
+### Using Cloudflare (Recommended)
 
-#### Step 1: Install Certbot
+The easiest way to add HTTPS is to use Cloudflare's proxy service:
 
-```bash
-ssh into EC2 instance
-sudo apt install certbot python3-certbot-nginx -y
+1. Add your domain to Cloudflare
+2. Set SSL/TLS mode to "Flexible"
+3. Enable "Always Use HTTPS" in SSL/TLS settings
+4. Cloudflare will handle SSL termination at their edge
+
+### Alternative: Streamlit with SSL
+
+For direct SSL configuration with Streamlit, update `.streamlit/config.toml`:
+
+```toml
+[server]
+sslCertFile = "/path/to/cert.pem"
+sslKeyFile = "/path/to/key.pem"
 ```
 
-#### Step 2: Stop Nginx Container
-
-```bash
-cd architecture-fullstack
-docker-compose stop reverse-proxy
-```
-
-#### Step 3: Obtain Certificate
-
-```bash
-sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
-```
-
-Follow prompts to complete.
-
-#### Step 4: Update Nginx Configuration
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com www.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name yourdomain.com www.yourdomain.com;
-    
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    
-    location / {
-        proxy_pass http://dashboard-report:8501;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-#### Step 5: Update docker-compose.yaml
-
-```yaml
-reverse-proxy:
-  volumes:
-    - ./reverse_proxy/nginx.conf:/etc/nginx/nginx.conf
-    - /etc/letsencrypt:/etc/letsencrypt:ro
-  ports:
-    - 80:80
-    - 443:443
-```
-
-#### Step 6: Restart
-
-```bash
-docker-compose up -d
-```
-
-#### Step 7: Auto-Renewal
-
-```bash
-# Test renewal
-sudo certbot renew --dry-run
-
-# Set up cron job
-sudo crontab -e
-
-# Add this line:
-0 3 * * * certbot renew --quiet && docker-compose restart reverse-proxy
-```
+Note: This requires obtaining SSL certificates via Let's Encrypt or another certificate authority.
 
 ## 🔧 Troubleshooting
 
@@ -590,7 +489,6 @@ docker-compose up -d
 tar -czf backup-$(date +%Y%m%d).tar.gz \
   docker-compose.yaml \
   Dockerfile \
-  reverse_proxy/ \
   .streamlit/
 ```
 

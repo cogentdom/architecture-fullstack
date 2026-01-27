@@ -118,8 +118,6 @@ Create a visual architecture diagram:
 ```
 User Browser
     ↓
-Nginx (Port 80)
-    ↓
 Streamlit (Port 8501)
     ↓
 yfinance API

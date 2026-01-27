@@ -39,8 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Infrastructure**
   - Docker containerization with multi-stage build
-  - Docker Compose orchestration (Nginx + Streamlit)
-  - Nginx reverse proxy configuration
+  - Docker Compose orchestration
   - Makefile for build automation
   - Support for multiple deployment targets (Docker Hub, GitHub Packages)
 
@@ -62,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Streamlit**: 1.40.1
 - **Core Libraries**: pandas 2.0.3, numpy 1.22.4, statsmodels 0.14.1
 - **Visualization**: plotly 6.5.2, matplotlib 3.7.5, seaborn 0.11.2
-- **Container**: Docker with Nginx 1.17.10
+- **Container**: Docker
 - **Data Source**: Yahoo Finance API
 
 #### Supported Tickers

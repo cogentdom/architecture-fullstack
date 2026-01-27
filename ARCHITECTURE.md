@@ -11,12 +11,6 @@ This document provides a detailed technical overview of the Financial Time Serie
 │                        User Layer                            │
 │                    (Web Browser)                             │
 └────────────────────────┬────────────────────────────────────┘
-                         │ HTTP/HTTPS
-                         │ Port 80/443
-┌────────────────────────▼────────────────────────────────────┐
-│                   Nginx Reverse Proxy                        │
-│              (Load Balancing & SSL Termination)              │
-└────────────────────────┬────────────────────────────────────┘
                          │ HTTP
                          │ Port 8501
 ┌────────────────────────▼────────────────────────────────────┐
@@ -158,20 +152,10 @@ COLOR_PALETTE = {
 
 #### Docker Configuration
 
-**Multi-Container Setup**:
+**Container Setup**:
 
 ```yaml
 services:
-  reverse-proxy:
-    image: nginx:1.17.10
-    container_name: reverse_proxy_demo
-    depends_on:
-      - dashboard-report
-    volumes:
-      - ./reverse_proxy/nginx.conf:/etc/nginx/nginx.conf
-    ports:
-      - 80:80
-
   dashboard-report:
     image: dashboard:v0
     container_name: dashboard-report
@@ -186,15 +170,6 @@ services:
 - Multi-stage potential for future optimization
 - Layer caching for faster rebuilds
 - Health checks for container orchestration
-
-#### Nginx Reverse Proxy
-
-**Benefits**:
-- SSL/TLS termination
-- Load balancing (future scalability)
-- Static file serving optimization
-- Security (hide internal ports)
-- Custom domain mapping
 
 ## 🔄 Data Flow
 
@@ -338,7 +313,7 @@ localhost:8501 → Streamlit App
 
 ### Docker Local
 ```
-localhost:80 → Nginx → localhost:8501 → Streamlit Container
+localhost:8501 → Streamlit Container
 ```
 
 ### AWS EC2 Production
@@ -347,9 +322,7 @@ Domain (Cloudflare DNS)
     ↓
 EC2 Public IP (Elastic IP recommended)
     ↓
-Port 80/443 → Nginx Container
-    ↓
-Internal Network → Streamlit Container
+Port 8501 → Streamlit Container
 ```
 
 ### Scaling Strategy
@@ -380,7 +353,7 @@ Internal Network → Streamlit Container
 3. **Infrastructure**:
    - Docker health checks
    - EC2 CloudWatch metrics
-   - Nginx access logs
+   - Application access logs
 
 ## 🧪 Testing Strategy
 
@@ -424,14 +397,9 @@ Internal Network → Streamlit Container
 - **Decision**: Starting point; can add LSTM/Prophet later
 
 ### Why Docker Compose?
-- **Pros**: Simple multi-container setup, easy local development
+- **Pros**: Simple container setup, easy local development
 - **Cons**: Not production-grade orchestration
 - **Decision**: Sufficient for single-instance deployment; can migrate to K8s
-
-### Why Nginx?
-- **Pros**: Battle-tested, efficient, easy SSL setup
-- **Cons**: Extra complexity for simple setup
-- **Decision**: Enables custom domain and future load balancing
 
 ## 🔗 Related Documentation
 

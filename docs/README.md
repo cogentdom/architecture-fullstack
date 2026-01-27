@@ -150,7 +150,6 @@ docs/
 ### Infrastructure Features
 
 - **Docker Containerization**: [DEPLOYMENT.md § Docker Local Deployment](DEPLOYMENT.md#-docker-local-deployment)
-- **Nginx Reverse Proxy**: [ARCHITECTURE.md § Infrastructure Layer](../ARCHITECTURE.md#5-infrastructure-layer)
 - **AWS Deployment**: [DEPLOYMENT.md § AWS EC2 Deployment](DEPLOYMENT.md#%EF%B8%8F-aws-ec2-deployment)
 - **Custom Domain**: [DEPLOYMENT.md § Custom Domain Setup](DEPLOYMENT.md#-custom-domain-setup)
 
@@ -176,7 +175,6 @@ docs/
 - [ARIMA Models Explained](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMA.html)
 - [Docker Documentation](https://docs.docker.com/)
 - [AWS EC2 Documentation](https://docs.aws.amazon.com/ec2/)
-- [Nginx Documentation](https://nginx.org/en/docs/)
 
 ## 🔍 Search Tips
 
