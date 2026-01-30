@@ -2,7 +2,9 @@
 
 A full-stack financial analytics dashboard featuring real-time stock market data analysis, ARIMA forecasting models, and interactive visualizations—containerized with Docker and deployable to AWS EC2 with custom domain support.
 
-![banner](https://cogentdom.wordpress.com/wp-content/uploads/2026/01/stock-market-analysis.png)  
+
+
+[![Watch the video](https://cogentdom.wordpress.com/wp-content/uploads/2026/01/stock-market-analysis.png)](https://portingdata.com/wp-content/uploads/2026/01/stock-analysis-dashboard.mov)
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.40-red.svg)
