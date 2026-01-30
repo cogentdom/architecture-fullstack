@@ -2,6 +2,8 @@
 
 A full-stack financial analytics dashboard featuring real-time stock market data analysis, ARIMA forecasting models, and interactive visualizations—containerized with Docker and deployable to AWS EC2 with custom domain support.
 
+![banner](https://cogentdom.wordpress.com/wp-content/uploads/2026/01/stock-market-analysis.png)  
+
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.40-red.svg)
 ![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)
@@ -295,9 +297,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📧 Contact
 
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter)
+>Dominik Huffield  
+>Twitter - [@cogentdom](https://twitter.com/cogentdom)  
+>My Work - [portfolio](https://portingdata.com)  
+>Business - [ohmic data](https://toroai.io)  
 
-Project Link: [https://github.com/yourusername/architecture-fullstack](https://github.com/yourusername/architecture-fullstack)
+Project Link: [architecture-fullstack](https://github.com/cogentdom/architecture-fullstack)  
 
 ---
 
